@@ -1,15 +1,6 @@
 class Prawn::SVG::Color
-  class Hex
-    attr_reader :value
-
-    def initialize(value)
-      @value = value
-    end
-
-    def ==(other)
-      value == other.value
-    end
-  end
+  Hex = Struct.new(:value)
+  CMYK = Struct.new(:value)
 
   DEFAULT_COLOR = Hex.new("000000")
 
@@ -165,6 +156,7 @@ class Prawn::SVG::Color
 
   RGB_VALUE_REGEXP = "\s*(-?[0-9.]+%?)\s*"
   RGB_REGEXP = /\Argb\(#{RGB_VALUE_REGEXP},#{RGB_VALUE_REGEXP},#{RGB_VALUE_REGEXP}\)\z/i
+  CMYK_REGEXP = /\Adevice-cmyk\(#{RGB_VALUE_REGEXP},#{RGB_VALUE_REGEXP},#{RGB_VALUE_REGEXP},#{RGB_VALUE_REGEXP}\)\z/i
   URL_REGEXP = /\Aurl\(([^)]*)\)\z/i
 
   def self.parse(color_string, gradients = nil)
@@ -191,6 +183,15 @@ class Prawn::SVG::Color
 
         Hex.new(hex)
 
+      elsif m = color.match(CMYK_REGEXP)
+        cmyk = (1..4).collect do |n|
+          value = m[n].to_f
+          value *= 100 unless m[n][-1..-1] == '%'
+          clamp(value, 0, 100)
+        end
+
+        CMYK.new(cmyk)
+
       elsif matches = color.match(URL_REGEXP)
         url_specified = true
         url = matches[1]
@@ -209,7 +210,7 @@ class Prawn::SVG::Color
   end
 
   def self.color_to_hex(color)
-    result = parse(color).detect {|result| result.is_a?(Hex)}
+    result = parse(color).detect {|result| result.is_a?(Hex) || result.is_a?(CMYK)}
     result.value if result
   end
 
